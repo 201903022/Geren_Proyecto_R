@@ -1,0 +1,194 @@
+---
+title: "Proyecto R"
+author: "Jonathan Alexander Sanchez Barrios – 201903022"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readr)
+```
+
+## 1. Cargar el dataset
+
+```{r}
+bank <- read_delim(
+  "https://raw.githubusercontent.com/selva86/datasets/master/bank-full.csv",
+  delim = ";"
+)
+
+str(bank)
+head(bank)
+```
+
+---
+
+## 2. Manipulación de datos
+
+```{r}
+bank_sel <- bank %>%
+  select(age, job, marital, education, duration, loan, y)
+
+bank_filtrado <- bank_sel %>%
+  filter(duration > 150)
+
+bank_mutado <- bank_filtrado %>%
+  mutate(age_group = case_when(
+    age < 30 ~ "Joven",
+    age >= 30 & age < 50 ~ "Adulto",
+    TRUE ~ "Mayor"
+  ))
+
+bank_ordenado <- bank_mutado %>%
+  arrange(desc(duration))
+
+head(bank_ordenado)
+```
+
+---
+
+## 3. Agrupamiento y resumen
+
+```{r}
+resumen_edad <- bank_ordenado %>%
+  group_by(age_group) %>%
+  summarize(
+    promedio_duracion = mean(duration),
+    total_clientes = n()
+  )
+
+resumen_edad
+```
+
+---
+
+## 4. Conteo ponderado
+
+```{r}
+conteo_prestamo <- bank_ordenado %>%
+  count(loan, wt = duration, sort = TRUE)
+
+conteo_prestamo
+```
+
+---
+
+## 5. Visualizaciones
+
+### a) Gráfico de dispersión
+
+```{r}
+ggplot(bank_ordenado, aes(x = age, y = duration, color = loan)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Relación entre edad y duración de llamada",
+       x = "Edad", y = "Duración (segundos)") +
+  theme_minimal()
+```
+#### Análisis del gráfico
+
+La gráfica muestra la relación entre la edad de los clientes y la duración de las llamadas.
+Se observa que los adultos (30–50 años) concentran la mayor cantidad de llamadas y presentan mayor variabilidad en la duración, llegando incluso a más de 3000 segundos.
+Los jóvenes (<30) y mayores (>50) tienen llamadas más cortas y homogéneas.
+No existe una correlación clara entre edad y duración, aunque se aprecia una ligera tendencia decreciente: los clientes de mayor edad suelen tener llamadas más breves.
+La mayoría no tiene préstamo activo (loan = no), mientras que los que sí (yes) son pocos y están distribuidos de forma dispersa.
+En general, los adultos sin préstamo representan el segmento más activo e interesado, ideal para campañas telefónicas.
+
+---
+
+### b) Gráfico de columnas
+
+```{r}
+ggplot(resumen_edad, aes(x = age_group, y = promedio_duracion, fill = age_group)) +
+  geom_col() +
+  labs(title = "Promedio de duración por grupo de edad",
+       x = "Grupo de edad", y = "Duración promedio (seg)") +
+  theme_minimal()
+```
+#### Análisis del gráfico
+
+El gráfico muestra el promedio de duración de las llamadas según el grupo de edad de los clientes.
+Los tres grupos —Joven, Adulto y Mayor— presentan valores muy similares, entre 370 y 390 segundos, lo que indica que la edad no influye significativamente en la duración promedio de las llamadas.
+Aun así, los jóvenes registran el promedio ligeramente más alto, lo que puede reflejar mayor disposición al diálogo o menor experiencia financiera.
+En general, los tiempos de llamada son consistentes entre los grupos, sugiriendo una atención uniforme del banco a todos los rangos de edad.
+---
+
+### c) Histograma
+
+```{r}
+ggplot(bank_ordenado, aes(x = duration, fill = loan)) +
+  geom_histogram(bins = 25, alpha = 0.7) +
+  labs(title = "Distribución de duración de llamadas",
+       x = "Duración (segundos)", y = "Frecuencia") +
+  theme_minimal()
+```
+
+#### Análisis del gráfico
+
+La distribución de la duración de las llamadas muestra una alta concentración en valores bajos, especialmente por debajo de los 500 segundos.
+Esto indica que la mayoría de las llamadas son breves, mientras que las llamadas largas son poco frecuentes.
+El patrón tiene una forma sesgada hacia la derecha, típica de variables de tiempo o duración.
+La mayoría de los clientes no tiene préstamo activo (loan = no), y representan la mayor parte de las llamadas cortas.
+Los clientes con préstamo (yes) aparecen en menor cantidad, aunque algunos presentan llamadas más prolongadas, lo que podría asociarse a un mayor interés o seguimiento por parte del banco.
+
+---
+
+### d) Boxplot
+
+```{r}
+ggplot(bank_ordenado, aes(x = loan, y = duration, fill = loan)) +
+  geom_boxplot() +
+  labs(title = "Dispersión de duración por estado de préstamo",
+       x = "Tiene préstamo", y = "Duración (segundos)") +
+  theme_minimal()
+```
+#### Análisis del gráfico
+
+La gráfica muestra la tendencia de la duración de las llamadas ordenadas por cliente.
+Se observa una disminución pronunciada al inicio, donde pocos clientes registran llamadas muy largas (superiores a 3000 segundos), seguida de una caída progresiva y estabilización en valores bajos.
+Esto indica que la mayoría de los clientes realiza llamadas cortas, mientras que solo un grupo reducido mantiene conversaciones prolongadas.
+Los tres grupos de edad presentan un patrón similar, aunque los adultos y mayores predominan entre las llamadas más extensas, lo que sugiere una mayor interacción o seguimiento comercial por parte del banco en esos segmentos.
+
+---
+
+### e) Línea 
+
+```{r}
+bank_line <- bank_ordenado %>%
+  mutate(index = row_number())
+
+ggplot(bank_line, aes(x = index, y = duration, color = age_group)) +
+  geom_line() +
+  labs(title = "Tendencia de duración de llamadas por cliente",
+       x = "Cliente (índice)", y = "Duración (segundos)") +
+  theme_minimal()
+```
+
+#### Análisis del gráfico
+
+El gráfico muestra la dispersión de la duración de las llamadas según el estado de préstamo (loan).
+En los tres grupos (no, unknown, yes) se observa una gran concentración de llamadas por debajo de los 500 segundos, con valores atípicos (outliers) que alcanzan más de 4000 segundos.
+La mediana es similar entre los grupos, lo que indica que el estado del préstamo no influye significativamente en la duración promedio de las llamadas.
+Sin embargo, los clientes con préstamo (yes) presentan mayor dispersión, lo que sugiere que algunos casos requieren comunicaciones más extensas o de seguimiento más detallado por parte del banco.
+
+---
+
+## 6. Unión de tablas
+
+```{r}
+extra_info <- bank_ordenado %>%
+  select(job, education, duration) %>%
+  mutate(credit_score = ifelse(duration > 300, "Bueno", "Promedio"))
+
+union_bank <- inner_join(bank_ordenado, extra_info,
+                         by = c("job", "education", "duration"))
+
+union_filtrado <- union_bank %>%
+  filter(credit_score == "Bueno") %>%
+  select(age, job, duration, credit_score)
+
+union_filtrado %>%
+  group_by(job) %>%
+  summarize(promedio_duracion = mean(duration))
+```
+
